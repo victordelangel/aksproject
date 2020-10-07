@@ -1,34 +1,71 @@
-# ASP.NET
-# Build and test ASP.NET projects.
-# Add steps that publish symbols, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/apps/aspnet/build-aspnet-4
-
-trigger:
-- master
-
 pool:
-  vmImage: 'windows-latest'
-
-variables:
-  solution: '**/*.sln'
-  buildPlatform: 'Any CPU'
-  buildConfiguration: 'Release'
-
+  name: Azure Pipelines
 steps:
-- task: NuGetToolInstaller@1
-
-- task: NuGetCommand@2
+- task: qetza.replacetokens.replacetokens-task.replacetokens@3
+  displayName: 'Replace tokens in appsettings.json'
   inputs:
-    restoreSolution: '$(solution)'
+    rootDirectory: '$(build.sourcesdirectory)/src/MyHealth.Web'
+    targetFiles: appsettings.json
+    escapeType: none
+    tokenPrefix: '__'
+    tokenSuffix: '__'
 
-- task: VSBuild@1
+- task: qetza.replacetokens.replacetokens-task.replacetokens@3
+  displayName: 'Replace tokens in mhc-aks.yaml'
   inputs:
-    solution: '$(solution)'
-    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(build.artifactStagingDirectory)"'
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+    targetFiles: 'mhc-aks.yaml'
+    escapeType: none
+    tokenPrefix: '__'
+    tokenSuffix: '__'
 
-- task: VSTest@2
+- task: DockerCompose@0
+  displayName: 'Run services'
   inputs:
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+    azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+    azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+    dockerComposeFile: 'docker-compose.ci.build.yml'
+    action: 'Run services'
+    detached: false
+
+- task: DockerCompose@0
+  displayName: 'Build services'
+  inputs:
+    azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+    azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+    dockerComposeFile: 'docker-compose.yml'
+    dockerComposeFileArgs: 'DOCKER_BUILD_SOURCE='
+    action: 'Build services'
+    additionalImageTags: '$(Build.BuildId)'
+
+- task: DockerCompose@0
+  displayName: 'Push services'
+  inputs:
+    azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+    azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+    dockerComposeFile: 'docker-compose.yml'
+    dockerComposeFileArgs: 'DOCKER_BUILD_SOURCE='
+    action: 'Push services'
+    additionalImageTags: '$(Build.BuildId)'
+
+- task: DockerCompose@0
+  displayName: 'Lock services'
+  inputs:
+    azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+    azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+    dockerComposeFile: 'docker-compose.yml'
+    dockerComposeFileArgs: 'DOCKER_BUILD_SOURCE='
+    action: 'Lock services'
+
+- task: CopyFiles@2
+  displayName: 'Copy Files'
+  inputs:
+    Contents: |
+     **/mhc-aks.yaml
+     **/*.dacpac
+     
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact'
+  inputs:
+    ArtifactName: deploy
