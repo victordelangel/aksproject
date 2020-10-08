@@ -68,50 +68,35 @@ stages:
         action: 'Build services'
         additionalImageTags: '$(Build.BuildId)'
 
-    - task: Docker@2
-      displayName: Build and push an image to container registry
+    - task: DockerCompose@0
+      displayName: 'Push services'
       inputs:
-        command: buildAndPush
-        repository: $(imageRepository)
-        dockerfile: $(dockerfilePath)
-        containerRegistry: $(dockerRegistryServiceConnection)
-        tags: |
-          $(tag)
-       
-          
-    - upload: manifests
-      artifact: manifests
+        azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+        azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+        dockerComposeFile: 'docker-compose.yml'
+        dockerComposeFileArgs: 'DOCKER_BUILD_SOURCE='
+        action: 'Push services'
+        additionalImageTags: '$(Build.BuildId)'
 
-- stage: Deploy
-  displayName: Deploy stage
-  dependsOn: Build
+    - task: DockerCompose@0
+      displayName: 'Lock services'
+      inputs:
+        azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+        azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+        dockerComposeFile: 'docker-compose.yml'
+        dockerComposeFileArgs: 'DOCKER_BUILD_SOURCE='
+        action: 'Lock services'
 
-  jobs:
-  - deployment: Deploy
-    displayName: Deploy
-    pool:
-      vmImage: $(vmImageName)
-    environment: 'victordelangelaksproject.default'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - task: KubernetesManifest@0
-            displayName: Create imagePullSecret
-            inputs:
-              action: createSecret
-              secretName: $(imagePullSecret)
-              dockerRegistryEndpoint: $(dockerRegistryServiceConnection)
-              
-          - task: KubernetesManifest@0
-            displayName: Deploy to Kubernetes cluster
-            inputs:
-              action: deploy
-              manifests: |
-                $(Pipeline.Workspace)/manifests/deployment.yml
-                $(Pipeline.Workspace)/manifests/service.yml
-              imagePullSecrets: |
-                $(imagePullSecret)
-              containers: |
-                $(containerRegistry)/$(imageRepository):$(tag)
+    - task: CopyFiles@2
+      displayName: 'Copy Files'
+      inputs:
+        Contents: |
+         **/mhc-aks.yaml
+         **/*.dacpac
 
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact'
+      inputs:
+        ArtifactName: deploy
