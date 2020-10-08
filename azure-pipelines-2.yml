@@ -48,6 +48,25 @@ stages:
         escapeType: none
         tokenPrefix: '__'
         tokenSuffix: '__'
+        
+    - task: DockerCompose@0
+      displayName: 'Run services'
+      inputs:
+        azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+        azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+        dockerComposeFile: 'docker-compose.ci.build.yml'
+        action: 'Run services'
+        detached: false
+        
+    - task: DockerCompose@0
+      displayName: 'Build services'
+      inputs:
+        azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+        azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+        dockerComposeFile: 'docker-compose.yml'
+        dockerComposeFileArgs: 'DOCKER_BUILD_SOURCE='
+        action: 'Build services'
+        additionalImageTags: '$(Build.BuildId)'
 
     - task: Docker@2
       displayName: Build and push an image to container registry
