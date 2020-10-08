@@ -39,7 +39,7 @@ stages:
         displayName: 'Get latest CodeQL package. Install on Agent.'
 
       - script: |
-          ./codeql-runner-linux init --repository victordelangel/aksproject --github-url https://github.com --github-auth $(PAT-GITHUB) --config-file .github/codeql/codeql-config.yml 
+          ./codeql-runner-linux init --repository victordelangel/aksproject --github-url https://github.com --github-auth $(PAT-GITHUB) --config-file .github/workflows/codeql-analysis.yml 
         displayName: 'Initialize CodeQ Executable and create a CodeQL database'
 
       - script: |
