@@ -26,7 +26,6 @@ variables:
 stages:
 
 - stage: Security
-  dependsOn: Build
   displayName: Security validations
   jobs:
     - job: Validate
