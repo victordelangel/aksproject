@@ -43,7 +43,7 @@ stages:
         displayName: 'Initialize CodeQ Executable and create a CodeQL database'
 
       - script: |
-          ./codeql-runner-linux analyze --repository victordelangel/aksproject --github-url https://github.com --github-auth $(PAT-GITHUB) --commit df4591a80c500ed0f0f85c8b48fcde0529df639e --ref refs/heads/master
+          ./codeql-runner-linux analyze --repository victordelangel/aksproject --github-url https://github.com --github-auth $(PAT-GITHUB) --commit f72d9c0ff997ccd51c825d6c208ccbec326244af --ref refs/heads/master
         displayName: 'Populate the CodeQL runner databases, analyze them, and upload the results to GitHub.'
 
 - stage: Build
