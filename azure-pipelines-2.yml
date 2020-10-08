@@ -41,6 +41,14 @@ stages:
         tokenPrefix: '__'
         tokenSuffix: '__'
     
+    - task: qetza.replacetokens.replacetokens-task.replacetokens@3
+      displayName: 'Replace tokens in mhc-aks.yaml'
+      inputs:
+        targetFiles: 'mhc-aks.yaml'
+        escapeType: none
+        tokenPrefix: '__'
+        tokenSuffix: '__'
+
     - task: Docker@2
       displayName: Build and push an image to container registry
       inputs:
