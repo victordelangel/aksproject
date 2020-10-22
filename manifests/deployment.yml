@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: victordelangelaksproject 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: victordelangelaksproject
+  template:
+    metadata:
+      labels:
+        app: victordelangelaksproject 
+    spec:
+      containers:
+        - name: victordelangelaksproject 
+          image: videlaacr.azurecr.io/victordelangelaksproject
+          ports:
+          - containerPort: 80

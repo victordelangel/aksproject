@@ -1,0 +1,126 @@
+# Deploy to Azure Kubernetes Service
+# Build and push image to Azure Container Registry; Deploy to Azure Kubernetes Service
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- master
+
+resources:
+- repo: self
+
+variables:
+
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: '95fa9cb2-e63b-494b-833b-933719053b85'
+  imageRepository: 'myhealth.web'
+  containerRegistry: 'videlaacr.azurecr.io'
+  dockerfilePath: '**/Dockerfile'
+  tag: '$(Build.BuildId)'
+  imagePullSecret: 'videlaacr675b-auth'
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+  
+
+
+stages:
+
+#- stage: Security
+#  displayName: Security validations
+#  jobs:
+#    - job: Validate
+#      displayName: Validate security
+#      pool:
+#        vmImage: $(vmImageName)
+#      steps:
+#      - script: |
+#          wget https://github.com/github/codeql-action/releases/latest/download/codeql-runner-linux
+#          chmod +x codeql-runner-linux
+#        displayName: 'Get latest CodeQL package. Install on Agent.'
+#
+#      - script: |
+#          ./codeql-runner-linux init --repository victordelangel/aksproject --github-url https://github.com --github-auth $(PAT-GITHUB) --config-file .github/workflows/codeql-analysis.yml 
+#        displayName: 'Initialize CodeQ Executable and create a CodeQL database'
+#
+#      - script: |
+#          ./codeql-runner-linux analyze --repository victordelangel/aksproject --github-url https://github.com --github-auth $(PAT-GITHUB) --commit f72d9c0ff997ccd51c825d6c208ccbec326244af --ref refs/heads/master
+#        displayName: 'Populate the CodeQL runner databases, analyze them, and upload the results to GitHub.'
+
+- stage: Build
+  displayName: Build stage
+  jobs:  
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    
+    - task: qetza.replacetokens.replacetokens-task.replacetokens@3
+      displayName: 'Replace tokens in appsettings.json'
+      inputs:
+        rootDirectory: '$(build.sourcesdirectory)/src/MyHealth.Web'
+        targetFiles: appsettings.json
+        escapeType: none
+        tokenPrefix: '__'
+        tokenSuffix: '__'
+    
+    - task: qetza.replacetokens.replacetokens-task.replacetokens@3
+      displayName: 'Replace tokens in mhc-aks.yaml'
+      inputs:
+        targetFiles: 'mhc-aks.yaml'
+        escapeType: none
+        tokenPrefix: '__'
+        tokenSuffix: '__'
+        
+    - task: DockerCompose@0
+      displayName: 'Run services'
+      inputs:
+        azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+        azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+        dockerComposeFile: 'docker-compose.ci.build.yml'
+        action: 'Run services'
+        detached: false
+        
+    - task: DockerCompose@0
+      displayName: 'Build services'
+      inputs:
+        azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+        azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+        dockerComposeFile: 'docker-compose.yml'
+        dockerComposeFileArgs: 'DOCKER_BUILD_SOURCE='
+        action: 'Build services'
+        additionalImageTags: '$(Build.BuildId)'
+
+    - task: DockerCompose@0
+      displayName: 'Push services'
+      inputs:
+        azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+        azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+        dockerComposeFile: 'docker-compose.yml'
+        dockerComposeFileArgs: 'DOCKER_BUILD_SOURCE='
+        action: 'Push services'
+        additionalImageTags: '$(Build.BuildId)'
+
+    - task: DockerCompose@0
+      displayName: 'Lock services'
+      inputs:
+        azureSubscription: 'VIDELA-Containers (462d3323-cb7a-4777-b86b-a898f709917c)'
+        azureContainerRegistry: '{"loginServer":"videlaacr.azurecr.io", "id" : "/subscriptions/462d3323-cb7a-4777-b86b-a898f709917c/resourceGroups/akshandsonlab/providers/Microsoft.ContainerRegistry/registries/videlaacr"}'
+        dockerComposeFile: 'docker-compose.yml'
+        dockerComposeFileArgs: 'DOCKER_BUILD_SOURCE='
+        action: 'Lock services'
+
+    - task: CopyFiles@2
+      displayName: 'Copy Files'
+      inputs:
+        Contents: |
+         **/mhc-aks.yaml
+         **/*.dacpac
+
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact'
+      inputs:
+        ArtifactName: deploy
+
